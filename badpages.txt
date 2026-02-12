@@ -1,0 +1,27 @@
+Error on page 101: Message: invalid session id: session deleted as the browser has closed the connection
+from disconnected: not connected to DevTools
+  (Session info: chrome=144.0.7559.133); For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#invalidsessionidexception
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x5f5093
+	0x5f50d4
+	0x3eb490
+	0x3da43e
+	0x3f8ef3
+	0x45f00c
+	0x474df9
+	0x457f56
+	0x4296c9
+	0x42a484
+	0x847e34
+	0x8430c9
+	0x860add
+	0x60db38
+	0x6158ad
+	0x5fd848
+	0x5fda12
+	0x5e75fa
+	0x76405d49
+	0x77a0d83b
+	0x77a0d7c1
+

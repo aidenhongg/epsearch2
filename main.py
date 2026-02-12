@@ -17,6 +17,7 @@ args = parser.parse_args()
 
 START = args.start
 LIMIT = args.limit
+print(START, LIMIT)
 
 DOWNLOAD_PATH = os.path.abspath("./database")
 if not os.path.exists(DOWNLOAD_PATH):
@@ -26,7 +27,6 @@ LINK = "https://journaliststudio.google.com/pinpoint/search?collection=c109fa8e7
 chrome_options = Options()
 prefs = {"download.default_directory": DOWNLOAD_PATH}
 chrome_options.add_experimental_option("prefs", prefs)
-chrome_options.add_argument("--headless=new")
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 
