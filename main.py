@@ -6,15 +6,29 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
 import re
+import os
+import argparse
 
-DOWNLOAD_PATH = "./database"
+parser = argparse.ArgumentParser()
+parser.add_argument("--start", type=int, default=1, help="Starting page number")
+parser.add_argument("--limit", type=int, default=100, help="Ending page number")
+args = parser.parse_args()
+
+START = args.start
+LIMIT = args.limit
+
+DOWNLOAD_PATH = os.path.abspath("./database")
+if not os.path.exists(DOWNLOAD_PATH):
+    os.makedirs(DOWNLOAD_PATH)
 LINK = "https://journaliststudio.google.com/pinpoint/search?collection=c109fa8e7dcf42c1&p="
 
 chrome_options = Options()
 prefs = {"download.default_directory": DOWNLOAD_PATH}
 chrome_options.add_experimental_option("prefs", prefs)
+chrome_options.add_argument("--headless=new")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
 
 service = Service(ChromeDriverManager().install())
 driver = webdriver.Chrome(service=service, options=chrome_options)
@@ -44,15 +58,17 @@ def download_pinpoint_files(driver, wait, count):
 
         except Exception as e:
             print(f"Error waiting for file to open: {e}")
+            with open("./badfiles.txt", "a") as fe:
+                fe.write(f"{target.get_attribute('data-tooltip')}\n")
+
             driver.back()
             continue
         
     return filenames
 
-p = 1
 with open("filenames.txt", "a") as f:
-    while True:
-        driver.get(LINK + str(p))
+    while START <= LIMIT:
+        driver.get(LINK + str(START))
         wait = WebDriverWait(driver, 10)
         pagination_element = wait.until(lambda d: d.find_element(By.XPATH, "//*[contains(translate(text(), '0123456789,', ''), ' -  of ')]"))
         
@@ -62,15 +78,14 @@ with open("filenames.txt", "a") as f:
         start_num = int(match.group(1).replace(',', ''))
         end_num = int(match.group(2).replace(',', ''))
         count = end_num - start_num + 1
-        print(count)
 
         try:
             f.write("\n".join(download_pinpoint_files(driver, wait, count)) + "\n")
 
-        except TimeoutException:
-            print("No more files to download or page did not load properly.")
-            break
         except Exception as e:
             print(f"An error occurred: {e}")
+            with open("./badpages.txt", "a") as fe:
+                fe.write(f"Error on page {START}: {e}\n")
+            
             continue
-        p += 1
+        START += 1
