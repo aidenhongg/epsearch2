@@ -1,2 +1,10 @@
-selenium
-webdriver-manager
+python-dotenv
+torch
+torchvision
+torchaudio
+accelerate
+pymupdf
+transformers
+qwen_vl_utils
+bitsandbytes
+flash-attn
