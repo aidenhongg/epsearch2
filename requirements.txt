@@ -7,4 +7,3 @@ pymupdf
 transformers
 qwen_vl_utils
 bitsandbytes
-flash-attn

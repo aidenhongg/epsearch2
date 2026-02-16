@@ -9,20 +9,32 @@ from PIL import Image
 import csv
 import json
 import torch
+torch.cuda.empty_cache()
+from datetime import datetime
 
-MODEL_LIB = r"D:\AI_MODELS\QWEN"
-MODEL_ID = "Qwen/Qwen3-VL-7B-Instruct"
+
+MODEL_LIB = r"./qwen"
+MODEL_ID = "Qwen/Qwen3-VL-8B-Instruct"
 
 PROMPT = """
-Act as a professional document digitizer. 
-Convert the provided image into a clean Markdown format. 
-Preserve all headers, bullet points, and especially tables. 
-Do not include any conversational filler; output only the Markdown code.
+Transcribe the provided image into GitHub Flavored Markdown. 
+
+### STRICT TRANSCRIPTION RULES:
+1. **Verbatim Accuracy:** Transcribe all text EXACTLY as it appears. Do NOT correct spelling, punctuation, or grammar. 
+2. **Spacing & Typos:** If a word has improper spaces (e.g., "l e g a l") or typos, preserve them exactly.
+3. **Redactions:** Represent redacted text or black bars using [REDACTED] or "█".
+4. **Structure:** - Convert visual tables into Markdown table syntax. 
+   - Maintain headers (#, ##), bullet points, and numbered lists.
+5. **Formatting:** Use bolding or italics only where it exists in the original text.
+
+### OUTPUT INSTRUCTIONS:
+- Provide ONLY the Markdown code. 
+- No preamble, no postscript, and no conversational filler.
 """.strip()
 
 CORPUS_PATH = Path("./corpus")
 BAD_LOG = Path("./bad_OCR.txt")
-BATCH_SIZE = 2
+BATCH_SIZE = 16
 NUM_LOAD_WORKERS = 4
 
 model = Qwen3VLForConditionalGeneration.from_pretrained(
@@ -30,7 +42,6 @@ model = Qwen3VLForConditionalGeneration.from_pretrained(
     torch_dtype=torch.bfloat16, 
     device_map="auto",
     cache_dir=MODEL_LIB,
-    attn_implementation="flash_attention_2",
     quantization_config=BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16),
 )
 processor = AutoProcessor.from_pretrained(
@@ -94,9 +105,11 @@ def _generate_batch(inputs) -> list[str]:
     generated_ids_trimmed = [
         out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
     ]
+    del generated_ids
     output_texts = processor.batch_decode(
         generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=True
     )
+    del generated_ids_trimmed
 
     return [delete_md(t) for t in output_texts]
 
@@ -144,7 +157,10 @@ class OCRPipeline:
     def _process_batch(images, meta, record, bad_writer, bad_file):
         try:
             inputs = _preprocess_batch(images)
+            del images
             results = _generate_batch(inputs)
+            del inputs
+            torch.cuda.empty_cache()
             for (scan_path, filename, page, img_index), text in zip(meta, results):
                 key = f"p{page}i{img_index}"
                 record[key] = {"text": text}
@@ -175,7 +191,7 @@ def yield_images():
             reader = csv.DictReader(clf_file)
             for row in reader:
                 if row["class"] == "0":
-                    yield (i, Path(row["scan_path"]), row["filename"], int(row["page"]), int(row["image"]))
+                    yield (i, Path(row["scan_path"].replace("\\", "/")), row["filename"], int(row["page"]), int(row["image"]))
 
 def _write_record(ocr_file, record):
     """Write a completed filename record to JSONL if it has any OCR entries."""
@@ -200,6 +216,8 @@ def main():
         ocr_file = None
         batch_meta = []  # (scan_path, filename, page, img_index) — images loaded later in parallel
 
+        bad_writer.writerow([str(datetime.now()),'','','',''])
+        bad_file.flush()
         try:
             for corpus_idx, scan_path, filename, page, img_index in yield_images():
                 # Open new JSONL file when corpus dir changes
@@ -253,6 +271,7 @@ def main():
             if current_record:
                 _write_record(ocr_file, current_record)
         finally:
+            bad_writer.writerow([str(datetime.now()),'','','',''])
             pipeline.shutdown()
             if ocr_file:
                 ocr_file.close()
